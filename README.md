@@ -1,7 +1,12 @@
-# Claude Lab
+# Manifold Graph
 
-A sandbox plugin for personal quality-of-life tweaks to Obsidian. One plugin, many
-small features, each one self-contained so a good one can be lifted out later.
+Binds Obsidian's graph view to the rest of the app, in both directions. Pointing at
+anything that names a note highlights its node in the graph; selecting nodes in the
+graph drives the file explorer's selection. The explorer's selection is the single
+source of truth — the graph is a view onto it that can also write to it.
+
+Features are self-contained modules on a shared host, so each owns its settings and
+can be switched off without touching the other.
 
 No build step. `main.js` is plain CommonJS and is exactly what Obsidian loads —
 edit it and hit **Reload app without saving** (or toggle the plugin off/on).

@@ -1,5 +1,5 @@
 "use strict";
-/* Headless harness for Claude Lab's graph selection tools: alt-click toggling,
+/* Headless harness for Manifold's graph selection tools: alt-click toggling,
    the shift-lasso and its deselect-wins rule, and the multi-file context menu.
 
    Run with the Node bundled inside NodeGX:

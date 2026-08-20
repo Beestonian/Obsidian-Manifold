@@ -1,7 +1,13 @@
 "use strict";
 
 /*
- * Claude Lab -- a sandbox plugin holding a collection of small QOL features.
+ * Manifold Graph -- binds Obsidian's graph view to the rest of the app, both ways.
+ *
+ * Pointing at anything that names a note (a link, a tag, a property value, an
+ * explorer row) highlights its node in the graph and fades the rest. Selecting
+ * nodes in the graph -- click, lasso, or walking the edges -- drives the file
+ * explorer's own selection. The explorer's selection is the single source of
+ * truth; the graph is a view onto it that can also write to it.
  *
  * No build step: this file is plain CommonJS and is what Obsidian loads
  * directly. Everything lives in one file because Obsidian only loads main.js
@@ -234,19 +240,19 @@ function watchTreeSelection(tree, onChange) {
         try {
           onChange();
         } catch (err) {
-          console.error("[Claude Lab] selection listener failed", err);
+          console.error("[Manifold] selection listener failed", err);
         }
       }
       return result;
     };
-    wrapper.claudeLabWatch = token;
+    wrapper.manifoldWatch = token;
     tree[name] = wrapper;
   }
 
   return () => {
     live = false;
     for (const name of Object.keys(originals)) {
-      if (tree[name] && tree[name].claudeLabWatch === token) tree[name] = originals[name];
+      if (tree[name] && tree[name].manifoldWatch === token) tree[name] = originals[name];
     }
   };
 }
@@ -399,8 +405,8 @@ class GraphHoverHighlight extends Feature {
         for (const renderer of this.targetRenderers()) total += this.repairLinks(renderer);
         new Notice(
           total
-            ? `Claude Lab: removed ${total} orphaned link${total === 1 ? "" : "s"}`
-            : "Claude Lab: no orphaned links found",
+            ? `Manifold: removed ${total} orphaned link${total === 1 ? "" : "s"}`
+            : "Manifold: no orphaned links found",
           5000
         );
       },
@@ -1093,7 +1099,7 @@ class GraphHoverHighlight extends Feature {
     if (intent.fromGraph) this.showInExplorer(candidates);
     else this.clearExplorerHover();
     if (this.settings.debug) {
-      console.log("[Claude Lab] graph hover", {
+      console.log("[Manifold] graph hover", {
         kind: intent.kind,
         text: intent.text,
         candidates,
@@ -1122,7 +1128,7 @@ class GraphHoverHighlight extends Feature {
         renderer.changed();
       }
     } catch (err) {
-      if (this.settings.debug) console.error("[Claude Lab] clear failed", err);
+      if (this.settings.debug) console.error("[Manifold] clear failed", err);
     }
   }
 
@@ -1183,17 +1189,17 @@ class GraphHoverHighlight extends Feature {
           self.activeRenderers.delete(this);
         }
       } catch (err) {
-        console.error("[Claude Lab] failed to release before a rebuild", err);
+        console.error("[Manifold] failed to release before a rebuild", err);
       }
       const result = original.apply(this, args);
       try {
         self.onGraphRebuilt(this);
       } catch (err) {
-        console.error("[Claude Lab] failed to repaint after a rebuild", err);
+        console.error("[Manifold] failed to repaint after a rebuild", err);
       }
       return result;
     };
-    renderer.claudeLabSetData = original;
+    renderer.manifoldSetData = original;
     this.patchedRenderers.add(renderer);
   }
 
@@ -1209,7 +1215,7 @@ class GraphHoverHighlight extends Feature {
     const self = this;
     const chain = (name, after) => {
       const current = renderer[name];
-      if (current && current.claudeLab) return; // already ours
+      if (current && current.manifold) return; // already ours
       const wrapper = function (...args) {
         // Ours runs FIRST. The view's own onNodeHover triggers the workspace
         // "hover-link" event, which comes straight back to us through the other
@@ -1218,12 +1224,12 @@ class GraphHoverHighlight extends Feature {
         try {
           after();
         } catch (err) {
-          console.error("[Claude Lab] node hover handler failed", err);
+          console.error("[Manifold] node hover handler failed", err);
         }
         if (current) current.apply(this, args);
       };
-      wrapper.claudeLab = true;
-      wrapper.claudeLabOriginal = current || null;
+      wrapper.manifold = true;
+      wrapper.manifoldOriginal = current || null;
       renderer[name] = wrapper;
     };
     chain("onNodeHover", () => self.onGraphNodeHover(renderer));
@@ -1380,16 +1386,16 @@ class GraphHoverHighlight extends Feature {
 
   unwatchRenderers() {
     for (const renderer of this.patchedRenderers) {
-      const original = renderer.claudeLabSetData;
+      const original = renderer.manifoldSetData;
       if (original) renderer.setData = original;
-      delete renderer.claudeLabSetData;
+      delete renderer.manifoldSetData;
     }
     this.patchedRenderers.clear();
 
     for (const renderer of this.hoverWrappedRenderers) {
       for (const name of ["onNodeHover", "onNodeUnhover"]) {
         const current = renderer[name];
-        if (current && current.claudeLab) renderer[name] = current.claudeLabOriginal;
+        if (current && current.manifold) renderer[name] = current.manifoldOriginal;
       }
     }
     this.hoverWrappedRenderers.clear();
@@ -1500,7 +1506,7 @@ class GraphHoverHighlight extends Feature {
       try {
         if (link && typeof link.clearGraphics === "function") link.clearGraphics();
       } catch (err) {
-        if (this.settings.debug) console.error("[Claude Lab] clearGraphics failed", err);
+        if (this.settings.debug) console.error("[Manifold] clearGraphics failed", err);
       }
       const i = links.indexOf(link);
       if (i >= 0) links.splice(i, 1);
@@ -1542,7 +1548,7 @@ class GraphHoverHighlight extends Feature {
     };
     this.recordId = window.requestAnimationFrame(step);
     new Notice(
-      `Claude Lab: recording ${seconds || 30}s. Reproduce it now — hover a node, move off it, wait, then leave the graph.`,
+      `Manifold: recording ${seconds || 30}s. Reproduce it now — hover a node, move off it, wait, then leave the graph.`,
       6000
     );
   }
@@ -1619,17 +1625,17 @@ class GraphHoverHighlight extends Feature {
     }
     const body =
       "```\n" +
-      "Claude Lab graph focus recording\n" +
+      "Manifold graph focus recording\n" +
       "state lines are emitted only when something changed\n\n" +
       (this.log || []).join("\n") +
       "\n```\n";
-    const path = "Claude Lab log.md";
+    const path = "Manifold log.md";
     try {
       await this.app.vault.adapter.write(path, body);
-      new Notice(`Claude Lab: saved ${this.log.length} lines to "${path}"`, 8000);
+      new Notice(`Manifold: saved ${this.log.length} lines to "${path}"`, 8000);
     } catch (err) {
-      console.error("[Claude Lab] could not save log", err);
-      new Notice("Claude Lab: could not write the log, dumped to console instead", 8000);
+      console.error("[Manifold] could not save log", err);
+      new Notice("Manifold: could not write the log, dumped to console instead", 8000);
     }
     console.log(body);
   }
@@ -1677,7 +1683,7 @@ class GraphHoverHighlight extends Feature {
           }
         }
         const wired =
-          renderer.onNodeHover && renderer.onNodeHover.claudeLab ? "ours" : "NOT ours";
+          renderer.onNodeHover && renderer.onNodeHover.manifold ? "ours" : "NOT ours";
 
         // idleFrames > 60 means the renderer has stopped drawing entirely, so a
         // focus written into it would sit there invisible until something wakes
@@ -1731,7 +1737,7 @@ class GraphHoverHighlight extends Feature {
       lines.push("last hover: nothing hovered yet");
     }
     const report = lines.join("\n");
-    console.log("[Claude Lab] diagnose\n" + report);
+    console.log("[Manifold] diagnose\n" + report);
     new Notice(report, 10000);
   }
 
@@ -2064,7 +2070,7 @@ class GraphSelectionTools extends Feature {
     for (const renderer of this.wrapped) {
       for (const name of ["onNodeClick", "onNodeRightClick"]) {
         const current = renderer[name];
-        if (current && current.claudeLabTools) renderer[name] = current.claudeLabOriginal;
+        if (current && current.manifoldTools) renderer[name] = current.manifoldOriginal;
       }
     }
     this.wrapped.clear();
@@ -2282,12 +2288,12 @@ class GraphSelectionTools extends Feature {
   topologyContext() {
     const renderer = this.graphForSelection();
     if (!renderer) {
-      new Notice("Claude Lab: no graph open", 3000);
+      new Notice("Manifold: no graph open", 3000);
       return null;
     }
     const selected = this.selectedPaths();
     if (!selected.size) {
-      new Notice("Claude Lab: nothing selected", 3000);
+      new Notice("Manifold: nothing selected", 3000);
       return null;
     }
     return { renderer, selected, adjacency: this.visibleAdjacency(renderer) };
@@ -2304,7 +2310,7 @@ class GraphSelectionTools extends Feature {
       }
     }
     if (!add.size) {
-      new Notice("Claude Lab: nothing new to reach", 2500);
+      new Notice("Manifold: nothing new to reach", 2500);
       return;
     }
     const n = this.select([...add]);
@@ -2326,7 +2332,7 @@ class GraphSelectionTools extends Feature {
       if (neighbours.some((other) => !ctx.selected.has(other))) remove.push(path);
     }
     if (!remove.length) {
-      new Notice("Claude Lab: nothing on the edge to drop", 2500);
+      new Notice("Manifold: nothing on the edge to drop", 2500);
       return;
     }
     const n = this.deselect(remove);
@@ -2350,7 +2356,7 @@ class GraphSelectionTools extends Feature {
     }
     const add = [...seen].filter((path) => !ctx.selected.has(path));
     if (!add.length) {
-      new Notice("Claude Lab: the selection is already a whole cluster", 2500);
+      new Notice("Manifold: the selection is already a whole cluster", 2500);
       return;
     }
     const n = this.select(add);
@@ -2378,7 +2384,7 @@ class GraphSelectionTools extends Feature {
   /** Ours runs first and can swallow the click, so alt-click never opens. */
   chainClick(renderer, name, handler) {
     const current = renderer[name];
-    if (current && current.claudeLabTools) return;
+    if (current && current.manifoldTools) return;
     const wrapper = function (...args) {
       // If our handler throws, fall through to Obsidian's rather than
       // swallowing the click: a broken plugin should degrade to no plugin.
@@ -2386,13 +2392,13 @@ class GraphSelectionTools extends Feature {
       try {
         consumed = handler(...args);
       } catch (err) {
-        console.error("[Claude Lab] node click handler failed", err);
+        console.error("[Manifold] node click handler failed", err);
       }
       if (consumed) return;
       if (current) current.apply(this, args);
     };
-    wrapper.claudeLabTools = true;
-    wrapper.claudeLabOriginal = current || null;
+    wrapper.manifoldTools = true;
+    wrapper.manifoldOriginal = current || null;
     renderer[name] = wrapper;
   }
 
@@ -2633,7 +2639,7 @@ class ClaudeLabPlugin extends Plugin {
         feature.onload();
       } catch (err) {
         console.error(
-          `[Claude Lab] feature "${feature.constructor.id}" failed to load`,
+          `[Manifold] feature "${feature.constructor.id}" failed to load`,
           err
         );
       }
@@ -2648,7 +2654,7 @@ class ClaudeLabPlugin extends Plugin {
         feature.onunload();
       } catch (err) {
         console.error(
-          `[Claude Lab] feature "${feature.constructor.id}" failed to unload`,
+          `[Manifold] feature "${feature.constructor.id}" failed to unload`,
           err
         );
       }

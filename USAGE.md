@@ -1,6 +1,6 @@
-# Using Manifold
+# Using Manifold Graph
 
-Manifold wires Obsidian's graph view to the rest of the app, in both directions.
+Manifold Graph wires Obsidian's graph view to the rest of the app, in both directions.
 
 - **Point at something anywhere in Obsidian** — a link, a tag, a property value, a
   file in the explorer — and its node lights up in the graph while everything
@@ -18,22 +18,18 @@ The graph stops being a picture you look at and becomes a pane you work in.
 
 ## Install
 
-Manifold has no build step. `main.js` is what Obsidian loads.
+Manifold Graph has no build step. `main.js` is what Obsidian loads.
 
-The clone folder **must be named after the `id` in `manifest.json`**, which is
-currently `claude-plugins`. Obsidian silently ignores a plugin folder whose name
-doesn't match its id.
+The clone folder **must match the `id` in `manifest.json`** — `manifold-graph`.
+Obsidian silently ignores a plugin folder whose name doesn't match its id, with no
+error to tell you why.
 
 ```bash
-git clone https://github.com/Beestonian/Obsidian-Manifold.git "YOUR_VAULT/.obsidian/plugins/claude-plugins"
+git clone https://github.com/Beestonian/Obsidian-Manifold.git "YOUR_VAULT/.obsidian/plugins/manifold-graph"
 ```
 
-Then in Obsidian: **Settings → Community plugins → Reload**, and enable the plugin.
-
-> **Note:** the plugin id and display name still read `claude-plugins` / "Claude Lab"
-> from before this repo was named Manifold. Renaming both is pending — when it
-> lands, the clone folder becomes `manifold` and existing users will need to rename
-> their folder and re-enable the plugin once.
+Then in Obsidian: **Settings → Community plugins → Reload**, and enable
+**Manifold Graph**.
 
 To update, `git pull` and use **Reload app without saving** from the command palette.
 

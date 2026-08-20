@@ -1,5 +1,5 @@
 "use strict";
-/* Headless harness for the Claude Lab graph-hover feature.
+/* Headless harness for the Manifold graph-hover feature.
    Stubs the `obsidian` module and a minimal DOM, then exercises both input
    channels (raw DOM hover, and the workspace "hover-link" event that Bases /
    properties / search use), the shared resolver, and the write into a fake
@@ -937,7 +937,7 @@ let feature;
   check("and that costs no repaints at all", globalRenderer.changes, before);
 
   /* A marker parked on the renderer would outlive a plugin reload. */
-  check("the marker is not stored on the renderer", globalRenderer.claudeLabFolderMarker, undefined);
+  check("the marker is not stored on the renderer", globalRenderer.manifoldFolderMarker, undefined);
 
   /* And it stops when the selection does. */
   reset();
