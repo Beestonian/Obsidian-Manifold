@@ -20,14 +20,20 @@ The graph stops being a picture you look at and becomes a pane you work in.
 
 Manifold has no build step. `main.js` is what Obsidian loads.
 
+The clone folder **must be named after the `id` in `manifest.json`**, which is
+currently `claude-plugins`. Obsidian silently ignores a plugin folder whose name
+doesn't match its id.
+
 ```bash
-git clone https://github.com/Beestonian/Obsidian-Manifold.git "YOUR_VAULT/.obsidian/plugins/manifold"
+git clone https://github.com/Beestonian/Obsidian-Manifold.git "YOUR_VAULT/.obsidian/plugins/claude-plugins"
 ```
 
-Then in Obsidian: **Settings → Community plugins → Reload**, and enable **Manifold**.
+Then in Obsidian: **Settings → Community plugins → Reload**, and enable the plugin.
 
-The folder name must match the `id` in `manifest.json`. If you change one, change
-both, or Obsidian won't load the plugin.
+> **Note:** the plugin id and display name still read `claude-plugins` / "Claude Lab"
+> from before this repo was named Manifold. Renaming both is pending — when it
+> lands, the clone folder becomes `manifold` and existing users will need to rename
+> their folder and re-enable the plugin once.
 
 To update, `git pull` and use **Reload app without saving** from the command palette.
 
@@ -199,7 +205,7 @@ default hotkeys; bind the rest yourself in **Settings → Hotkeys**.
 
 ## Settings
 
-Each feature has its own section in **Settings → Manifold**, and can be switched
+Each feature has its own section in the plugin's settings tab, and can be switched
 off entirely without affecting the other.
 
 ### Graph hover highlight
