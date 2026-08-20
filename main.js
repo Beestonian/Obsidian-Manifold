@@ -1963,6 +1963,7 @@ const SELECTION_TOOLS_DEFAULTS = {
   lasso: true,
   contextMenu: true,
   viewMenu: true,
+  pathMaxHops: 5,
   revealSelection: false,
   folderHints: true,
 };
@@ -2125,6 +2126,31 @@ class GraphSelectionTools extends Feature {
         group: "walk",
         hotkeys: [{ modifiers: ["Alt"], key: "l" }],
         run: () => this.selectConnected(),
+      },
+      {
+        id: "path-either-graph-selection",
+        name: "Shortest path between the first and last selected notes",
+        short: "Path, either way",
+        icon: "lucide-route",
+        group: "path",
+        hotkeys: [{ modifiers: ["Alt"], key: "p" }],
+        run: () => this.shortestPathSelection("both"),
+      },
+      {
+        id: "path-outgoing-graph-selection",
+        name: "Shortest path following links only",
+        short: "Path, following links",
+        icon: "lucide-arrow-right",
+        group: "path",
+        run: () => this.shortestPathSelection("outgoing"),
+      },
+      {
+        id: "path-backlinks-graph-selection",
+        name: "Shortest path following backlinks only",
+        short: "Path, following backlinks",
+        icon: "lucide-arrow-left",
+        group: "path",
+        run: () => this.shortestPathSelection("backlinks"),
       },
     ];
   }
@@ -2343,10 +2369,25 @@ class GraphSelectionTools extends Feature {
   }
 
   /** id -> Set of ids, built from the drawn links only. */
-  visibleAdjacency(renderer) {
-    const adjacency = new Map();
-    const links = Array.isArray(renderer.links) ? renderer.links : [];
-    const lookup = renderer.nodeLookup || {};
+  /**
+   * The drawn links, kept directional.
+   *
+   * forward is source -> target, the way the link is written. reverse is the
+   * backlink. Everything that walks the graph reads one of these or their
+   * union, so there is a single definition of "what is next to what" and the
+   * filters are honoured once, here.
+   */
+  directedAdjacency(renderer) {
+    const forward = new Map();
+    const reverse = new Map();
+    const links = Array.isArray(renderer && renderer.links) ? renderer.links : [];
+    const lookup = (renderer && renderer.nodeLookup) || {};
+
+    const join = (map, a, b) => {
+      if (!map.has(a)) map.set(a, new Set());
+      if (!map.has(b)) map.set(b, new Set());
+      map.get(a).add(b);
+    };
 
     for (const link of links) {
       const a = link && link.source && link.source.id;
@@ -2354,10 +2395,28 @@ class GraphSelectionTools extends Feature {
       if (!a || !b || a === b) continue;
       // Both ends have to still be part of the graph.
       if (!lookup[a] || !lookup[b]) continue;
-      if (!adjacency.has(a)) adjacency.set(a, new Set());
-      if (!adjacency.has(b)) adjacency.set(b, new Set());
-      adjacency.get(a).add(b);
-      adjacency.get(b).add(a);
+      join(forward, a, b);
+      join(reverse, b, a);
+    }
+    return { forward, reverse };
+  }
+
+  /**
+   * id -> Set of ids, ignoring which way each link points.
+   *
+   * Grow, shrink and cluster all want this: a neighbour is a neighbour whether
+   * you linked to it or it linked to you. Shortest path is the one operator
+   * where the direction is the actual question, so it reads the two maps
+   * separately instead.
+   */
+  visibleAdjacency(renderer) {
+    const { forward, reverse } = this.directedAdjacency(renderer);
+    const adjacency = new Map();
+    for (const map of [forward, reverse]) {
+      for (const [id, others] of map) {
+        if (!adjacency.has(id)) adjacency.set(id, new Set());
+        for (const other of others) adjacency.get(id).add(other);
+      }
     }
     return adjacency;
   }
@@ -2377,6 +2436,106 @@ class GraphSelectionTools extends Feature {
       if (this.fileFor(id)) out.add(id);
     }
     return out;
+  }
+
+  /**
+   * Breadth-first distances from one node, walking with `step`.
+   *
+   * Only files are walked through. A path that hops via a tag would make every
+   * pair of notes sharing #project two steps apart, which is the same reason
+   * grow refuses to travel through them -- the answer would be true and
+   * useless.
+   */
+  hopDistances(start, step, maxHops) {
+    const dist = new Map([[start, 0]]);
+    let frontier = [start];
+    for (let depth = 0; depth < maxHops && frontier.length; depth++) {
+      const next = [];
+      for (const id of frontier) {
+        const others = step(id);
+        if (!others) continue;
+        for (const other of others) {
+          if (dist.has(other)) continue;
+          if (!this.fileFor(other)) continue;
+          dist.set(other, depth + 1);
+          next.push(other);
+        }
+      }
+      frontier = next;
+    }
+    return dist;
+  }
+
+  /**
+   * Select every shortest path between the first and last selected notes.
+   *
+   * The explorer's selectedDoms is a Set, so it keeps insertion order: the
+   * note selected first is the start, the note selected last is the end.
+   * Deselecting and reselecting a note moves it to the end of that order.
+   *
+   * Ties are all kept rather than broken arbitrarily. Three equally short
+   * routes between two notes is the interesting answer -- a mesh editor picks
+   * one because it is cutting a surface, but here the braid is the point.
+   *
+   * Found by two searches, not by walking paths: distances from the start, then
+   * distances to the end, and a node is on some shortest path exactly when
+   * those two add up to the total.
+   */
+  shortestPathSelection(mode) {
+    const renderer = this.graphForSelection();
+    if (!renderer) {
+      new Notice("Manifold: no graph open", 3000);
+      return;
+    }
+
+    const selected = [...this.selectedPaths()];
+    if (selected.length < 2) {
+      new Notice("Manifold: select two notes first — the path runs from the first to the last", 4000);
+      return;
+    }
+
+    const from = selected[0];
+    const to = selected[selected.length - 1];
+    const { forward, reverse } = this.directedAdjacency(renderer);
+    const union = this.visibleAdjacency(renderer);
+
+    // Searching back from the end has to walk the opposite way round, or the
+    // two searches would not meet on a directed graph.
+    const maps =
+      mode === "outgoing"
+        ? [forward, reverse]
+        : mode === "backlinks"
+        ? [reverse, forward]
+        : [union, union];
+
+    const maxHops = Math.max(1, Number(this.settings.pathMaxHops) || 5);
+    const fromStart = this.hopDistances(from, (id) => maps[0].get(id), maxHops);
+    const total = fromStart.get(to);
+
+    if (total === undefined) {
+      const how =
+        mode === "outgoing" ? "following links" : mode === "backlinks" ? "following backlinks" : "either way";
+      new Notice(`Manifold: no path ${how} within ${maxHops} steps`, 4000);
+      return;
+    }
+
+    const fromEnd = this.hopDistances(to, (id) => maps[1].get(id), maxHops);
+    const onPath = [];
+    for (const [id, d] of fromStart) {
+      const back = fromEnd.get(id);
+      if (back !== undefined && d + back === total) onPath.push(id);
+    }
+
+    // Replace rather than add. The endpoints came from the selection, so
+    // leaving whatever else was selected alongside the answer would make the
+    // result impossible to read.
+    const tree = this.fileTree();
+    if (tree && tree.clearSelectedDoms) tree.clearSelectedDoms();
+    const n = this.select(onPath);
+    new Notice(
+      `Path of ${total} step${total === 1 ? "" : "s"} — selected ${n} note${n === 1 ? "" : "s"}`,
+      4000
+    );
   }
 
   /**
@@ -2803,6 +2962,24 @@ class GraphSelectionTools extends Feature {
         "Adds a Select submenu to the graph's tab menu, and to the right-click menu of a multi-selection. Every selection command is also in the command palette."
       )
       .addToggle((t) => t.setValue(s.viewMenu).onChange(bind("viewMenu")));
+
+    new Setting(containerEl)
+      .setName("Longest path to look for")
+      .setDesc(
+        "How many steps the shortest-path commands will search before giving up. A long route through a busy hub is technically the shortest one and usually means nothing."
+      )
+      .addText((t) =>
+        t
+          .setPlaceholder(String(SELECTION_TOOLS_DEFAULTS.pathMaxHops))
+          .setValue(String(s.pathMaxHops))
+          .onChange(async (value) => {
+            const num = Number(value);
+            if (!Number.isNaN(num) && num >= 1) {
+              s.pathMaxHops = num;
+              await this.saveSettings();
+            }
+          })
+      );
   }
 }
 /* ------------------------------------------------------------------ *

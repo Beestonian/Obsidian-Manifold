@@ -84,6 +84,31 @@ hides stay as they are.
 
 ---
 
+## Find the route between two notes
+
+Select one note. Then select a second note. Then press `Alt` `P`.
+
+The plugin selects the shortest route between them, and every note on the way.
+
+The order is important. The note that you select **first** is the start. The note
+that you select **last** is the end.
+
+| Command | Result |
+|---|---|
+| Path, either way (`Alt` `P`) | Uses links in both directions |
+| Path, following links | Uses only the links that go forward |
+| Path, following backlinks | Uses only the links that come back |
+
+If two routes are the same length, the plugin selects both. If there is no route,
+nothing changes.
+
+Routes do not pass through tags. Two notes with the same tag are not neighbours.
+
+You can change the longest route to look for in the settings. The default is 5
+steps.
+
+---
+
 ## Select notes by tag, folder or property
 
 Manifold Graph has no command for this. You do not need one. Use the search box in
@@ -182,6 +207,7 @@ Open **Settings → Manifold Graph**. You can turn off each part of the plugin.
 | Expand folders when selecting | off | Opens folders to show the selected files |
 | Right-click a selection for the file menu | on | Right-click menu |
 | Show a Select menu on the graph | on | Adds the **Select** menu to the graph tab and the right-click menu |
+| Longest path to look for | `5` | How many steps the path commands search before giving up |
 
 ---
 

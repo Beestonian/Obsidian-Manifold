@@ -349,12 +349,16 @@ function lasso(x1, y1, x2, y2) {
   check(
     "and every operator is in it",
     submenu && submenu.titles(),
-    ["All", "None", "Invert", "Grow along links", "Shrink from edges", "Whole cluster"]
+    [
+      "All", "None", "Invert",
+      "Grow along links", "Shrink from edges", "Whole cluster",
+      "Path, either way", "Path, following links", "Path, following backlinks",
+    ]
   );
   check(
     "grouped so the menu draws separators",
     submenu && submenu.items.map((i) => i.section),
-    ["basic", "basic", "basic", "walk", "walk", "walk"]
+    ["basic", "basic", "basic", "walk", "walk", "walk", "path", "path", "path"]
   );
 
   // The submenu is generated from the same table the palette is built from, so
@@ -428,6 +432,81 @@ function lasso(x1, y1, x2, y2) {
     [...tools.selectedPaths()].some((p) => p.startsWith("#") || p === "Ghost"),
     false
   );
+  reset();
+
+  /* =========== shortest path ===========
+     The fixture is a directed chain: Alpha -> Beta -> Deep, plus Alpha -> tag.
+     Selection order is the path's direction, so these select the start first
+     and the end last. */
+
+  const pathEnds = (a, b) => { reset(); tools.select([a]); tools.select([b]); };
+
+  pathEnds("Notes/Alpha.md", "Notes/Sub/Deep.md");
+  tools.shortestPathSelection("both");
+  check(
+    "the path picks up the note in the middle",
+    [...tools.selectedPaths()].sort(),
+    ["Notes/Alpha.md", "Notes/Beta.md", "Notes/Sub/Deep.md"]
+  );
+
+  pathEnds("Notes/Alpha.md", "Notes/Sub/Deep.md");
+  tools.shortestPathSelection("outgoing");
+  check(
+    "and following links only finds the same route",
+    [...tools.selectedPaths()].sort(),
+    ["Notes/Alpha.md", "Notes/Beta.md", "Notes/Sub/Deep.md"]
+  );
+
+  pathEnds("Notes/Alpha.md", "Notes/Sub/Deep.md");
+  tools.shortestPathSelection("backlinks");
+  check(
+    "but nothing links INTO Alpha, so backlinks find no route",
+    [...tools.selectedPaths()].sort(),
+    ["Notes/Alpha.md", "Notes/Sub/Deep.md"]
+  );
+
+  pathEnds("Notes/Sub/Deep.md", "Notes/Alpha.md");
+  tools.shortestPathSelection("backlinks");
+  check(
+    "turning the endpoints round makes the backlink route exist",
+    [...tools.selectedPaths()].sort(),
+    ["Notes/Alpha.md", "Notes/Beta.md", "Notes/Sub/Deep.md"]
+  );
+
+  // A second route of the same length. Both are kept -- a tie is the answer,
+  // not something to break.
+  renderer.links.push(link("Notes/Alpha.md", "Notes/Orphan.md"), link("Notes/Orphan.md", "Notes/Sub/Deep.md"));
+  pathEnds("Notes/Alpha.md", "Notes/Sub/Deep.md");
+  tools.shortestPathSelection("both");
+  check(
+    "two equally short routes are both selected",
+    [...tools.selectedPaths()].sort(),
+    ["Notes/Alpha.md", "Notes/Beta.md", "Notes/Orphan.md", "Notes/Sub/Deep.md"]
+  );
+  renderer.links.length -= 2;
+
+  // A tag would join Alpha to Deep in two steps as well, and must not count.
+  renderer.links.push(link("#some/tag", "Notes/Sub/Deep.md"));
+  pathEnds("Notes/Alpha.md", "Notes/Sub/Deep.md");
+  tools.shortestPathSelection("both");
+  check("a tag is never a stepping stone", tools.selectedPaths().has("Notes/Beta.md"), true);
+  check("and never lands in the selection", tools.selectedPaths().has("#some/tag"), false);
+  renderer.links.length -= 1;
+
+  tools.settings.pathMaxHops = 1;
+  pathEnds("Notes/Alpha.md", "Notes/Sub/Deep.md");
+  tools.shortestPathSelection("both");
+  check(
+    "a cap shorter than the route finds nothing and changes nothing",
+    [...tools.selectedPaths()].sort(),
+    ["Notes/Alpha.md", "Notes/Sub/Deep.md"]
+  );
+  tools.settings.pathMaxHops = 5;
+
+  reset();
+  tools.select(["Notes/Alpha.md"]);
+  tools.shortestPathSelection("both");
+  check("one note is not a path", [...tools.selectedPaths()], ["Notes/Alpha.md"]);
   reset();
 
   /* =========== growing and shrinking along visible links =========== */
