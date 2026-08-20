@@ -18,6 +18,43 @@ class FakeSetting {
   addText(cb) { cb({ setPlaceholder() { return this; }, setValue() { return this; }, onChange() { return this; } }); return this; }
 }
 let lastMenu = null;
+
+/* Enough of Obsidian's Menu to build and inspect a submenu: every item records
+   its title, section and icon, and setSubmenu() hands back another FakeMenu so
+   nested items land somewhere we can read them back. */
+class FakeMenu {
+  constructor(isSub) {
+    if (!isSub) lastMenu = this;
+    this.items = [];
+    this.shown = false;
+  }
+  addItem(cb) {
+    const menu = this;
+    const item = {
+      title: null,
+      section: null,
+      icon: null,
+      submenu: null,
+      click: null,
+      setTitle(v) { this.title = v; return this; },
+      setSection(v) { this.section = v; return this; },
+      setIcon(v) { this.icon = v; return this; },
+      onClick(fn) { this.click = fn; return this; },
+      setSubmenu() { this.submenu = new FakeMenu(true); return this.submenu; },
+    };
+    menu.items.push(item);
+    cb(item);
+    return this;
+  }
+  showAtMouseEvent() { this.shown = true; }
+  /** The submenu opened by the item with this title, or null. */
+  submenuUnder(title) {
+    const item = this.items.find((i) => i.title === title);
+    return (item && item.submenu) || null;
+  }
+  titles() { return this.items.map((i) => i.title); }
+}
+
 const workspaceHandlers = {};
 const fakeObsidian = {
   Plugin: class {
@@ -32,7 +69,7 @@ const fakeObsidian = {
   PluginSettingTab: class { constructor(app, plugin) { this.app = app; this.plugin = plugin; } },
   Setting: FakeSetting,
   Notice: class { constructor(msg) { this.msg = msg; } },
-  Menu: class { constructor() { lastMenu = this; this.shown = false; } showAtMouseEvent() { this.shown = true; } },
+  Menu: FakeMenu,
 };
 const origLoad = Module._load;
 Module._load = function (request) {
@@ -299,6 +336,66 @@ function lasso(x1, y1, x2, y2) {
   check(
     "right-clicking outside the selection is left alone",
     tools.onNodeRightClick({}, "Notes/Sub/Deep.md"),
+    false
+  );
+  reset();
+
+  /* =========== the Select submenu =========== */
+
+  tools.select(["Notes/Alpha.md", "Notes/Beta.md"]);
+  tools.onNodeRightClick({}, "Notes/Alpha.md");
+  const submenu = lastMenu && lastMenu.submenuUnder("Select");
+  check("the multi-file menu carries a Select submenu", !!submenu, true);
+  check(
+    "and every operator is in it",
+    submenu && submenu.titles(),
+    ["Invert", "Clear", "Grow along links", "Shrink from edges", "Whole cluster"]
+  );
+  check(
+    "grouped so the menu draws separators",
+    submenu && submenu.items.map((i) => i.section),
+    ["basic", "basic", "walk", "walk", "walk"]
+  );
+
+  // The submenu is generated from the same table the palette is built from, so
+  // clicking an item has to actually run the operator, not just look like it.
+  const invertItem = submenu.items.find((i) => i.title === "Invert");
+  invertItem.click();
+  check(
+    "clicking Invert in the submenu runs the operator",
+    [...tools.selectedPaths()].sort(),
+    ["Notes/Orphan.md", "Notes/Sub/Deep.md"]
+  );
+  reset();
+
+  /* =========== invert =========== */
+
+  tools.select(["Notes/Alpha.md"]);
+  tools.invertSelection();
+  check(
+    "invert drops the selection and takes everything else selectable",
+    [...tools.selectedPaths()].sort(),
+    ["Notes/Beta.md", "Notes/Orphan.md", "Notes/Sub/Deep.md"]
+  );
+  check("the inverted-away file is gone", tools.selectedPaths().has("Notes/Alpha.md"), false);
+
+  tools.invertSelection();
+  check(
+    "inverting twice returns the original selection",
+    [...tools.selectedPaths()].sort(),
+    ["Notes/Alpha.md"]
+  );
+  reset();
+
+  tools.invertSelection();
+  check(
+    "inverting nothing selects everything selectable",
+    [...tools.selectedPaths()].sort(),
+    ["Notes/Alpha.md", "Notes/Beta.md", "Notes/Orphan.md", "Notes/Sub/Deep.md"]
+  );
+  check(
+    "and never a tag or an unresolved link",
+    [...tools.selectedPaths()].some((p) => p.startsWith("#") || p === "Ghost"),
     false
   );
   reset();

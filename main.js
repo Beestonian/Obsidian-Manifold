@@ -1962,6 +1962,7 @@ const SELECTION_TOOLS_DEFAULTS = {
   altClickToggle: true,
   lasso: true,
   contextMenu: true,
+  viewMenu: true,
   revealSelection: false,
   folderHints: true,
 };
@@ -2030,34 +2031,112 @@ class GraphSelectionTools extends Feature {
       if (evt.key === "Escape" && this.lasso) this.endLasso(true);
     });
 
-    this.plugin.addCommand({
-      id: "grow-graph-selection",
-      name: "Grow selection along visible links",
-      hotkeys: [{ modifiers: ["Alt"], key: "=" }],
-      callback: () => this.growSelection(),
-    });
+    for (const op of this.selectOps()) {
+      this.plugin.addCommand({
+        id: op.id,
+        name: op.name,
+        hotkeys: op.hotkeys || [],
+        callback: () => op.run(),
+      });
+    }
 
-    this.plugin.addCommand({
-      id: "shrink-graph-selection",
-      name: "Shrink selection from its edges",
-      hotkeys: [{ modifiers: ["Alt"], key: "-" }],
-      callback: () => this.shrinkSelection(),
-    });
+    // The graph's tab / more-options menu. Obsidian fires this straight after
+    // the view's own onPaneMenu, which is the only opening a plugin gets.
+    this.plugin.registerEvent(
+      this.app.workspace.on("leaf-menu", (menu, leaf) => {
+        if (!this.settings.enabled || !this.settings.viewMenu) return;
+        const view = leaf && leaf.view;
+        const type = view && typeof view.getViewType === "function" && view.getViewType();
+        if (type !== "graph" && type !== "localgraph") return;
+        this.addSelectSubmenu(menu, "action");
+      })
+    );
+  }
 
-    this.plugin.addCommand({
-      id: "select-connected-graph-selection",
-      name: "Select everything connected to the selection",
-      hotkeys: [{ modifiers: ["Alt"], key: "l" }],
-      callback: () => this.selectConnected(),
-    });
-
-    this.plugin.addCommand({
-      id: "clear-graph-selection",
-      name: "Clear file selection",
-      callback: () => {
-        const tree = this.fileTree();
-        if (tree && tree.clearSelectedDoms) tree.clearSelectedDoms();
+  /* -------------------------------------------------- operator table
+   *
+   * Every selection operator has the same shape: read the current selection
+   * and the visible graph, write a new selection. So the command palette, the
+   * graph's tab menu and the node right-click menu are all generated from this
+   * one list instead of being written out three times. Adding an operator is
+   * adding a row.
+   *
+   * `name` is the palette entry and is deliberately verbose -- the palette is
+   * searched by typing. `short` is the menu label, where the surrounding menu
+   * already says what kind of thing this is. `group` drives the separators.
+   *
+   * Command ids are frozen: changing one silently drops whatever hotkey the
+   * user bound to it.
+   */
+  selectOps() {
+    return [
+      {
+        id: "invert-graph-selection",
+        name: "Invert selection in the visible graph",
+        short: "Invert",
+        icon: "lucide-flip-horizontal-2",
+        group: "basic",
+        hotkeys: [{ modifiers: ["Alt"], key: "i" }],
+        run: () => this.invertSelection(),
       },
+      {
+        id: "clear-graph-selection",
+        name: "Clear file selection",
+        short: "Clear",
+        icon: "lucide-x",
+        group: "basic",
+        run: () => {
+          const tree = this.fileTree();
+          if (tree && tree.clearSelectedDoms) tree.clearSelectedDoms();
+        },
+      },
+      {
+        id: "grow-graph-selection",
+        name: "Grow selection along visible links",
+        short: "Grow along links",
+        icon: "lucide-plus",
+        group: "walk",
+        hotkeys: [{ modifiers: ["Alt"], key: "=" }],
+        run: () => this.growSelection(),
+      },
+      {
+        id: "shrink-graph-selection",
+        name: "Shrink selection from its edges",
+        short: "Shrink from edges",
+        icon: "lucide-minus",
+        group: "walk",
+        hotkeys: [{ modifiers: ["Alt"], key: "-" }],
+        run: () => this.shrinkSelection(),
+      },
+      {
+        id: "select-connected-graph-selection",
+        name: "Select everything connected to the selection",
+        short: "Whole cluster",
+        icon: "lucide-git-fork",
+        group: "walk",
+        hotkeys: [{ modifiers: ["Alt"], key: "l" }],
+        run: () => this.selectConnected(),
+      },
+    ];
+  }
+
+  /** Fill a menu with every operator, grouped. Shared by both menu surfaces. */
+  fillSelectMenu(menu) {
+    for (const op of this.selectOps()) {
+      menu.addItem((item) => {
+        item.setTitle(op.short).setSection(op.group).onClick(() => op.run());
+        if (op.icon) item.setIcon(op.icon);
+      });
+    }
+  }
+
+  /** One "Select" entry that opens the operator list as a submenu. */
+  addSelectSubmenu(menu, section) {
+    menu.addItem((item) => {
+      item.setTitle("Select").setIcon("lucide-lasso");
+      if (section) item.setSection(section);
+      if (typeof item.setSubmenu !== "function") return;
+      this.fillSelectMenu(item.setSubmenu());
     });
   }
 
@@ -2274,6 +2353,58 @@ class GraphSelectionTools extends Feature {
     return adjacency;
   }
 
+  /**
+   * Every node currently in the graph that has a file behind it.
+   *
+   * nodeLookup is rebuilt by setData after the graph's filters run, so this is
+   * already the visible set -- the same "visible" that grow and shrink mean.
+   * Tag and unresolved nodes drop out here because there is no file to hand to
+   * the explorer.
+   */
+  selectableVisibleIds(renderer) {
+    const out = new Set();
+    const lookup = (renderer && renderer.nodeLookup) || {};
+    for (const id of Object.keys(lookup)) {
+      if (this.fileFor(id)) out.add(id);
+    }
+    return out;
+  }
+
+  /**
+   * Invert inside the visible graph.
+   *
+   * Selection outside the graph is left alone, which is the same rule the lasso
+   * follows: an operator only ever speaks for what it can see. So inverting
+   * while a search filter is active stays inside that search instead of
+   * reaching for the whole vault, and files selected elsewhere survive.
+   */
+  invertSelection() {
+    const renderer = this.graphForSelection();
+    if (!renderer) {
+      new Notice("Manifold: no graph open", 3000);
+      return;
+    }
+
+    const visible = this.selectableVisibleIds(renderer);
+    if (!visible.size) {
+      new Notice("Manifold: nothing selectable in this graph", 2500);
+      return;
+    }
+
+    const selected = this.selectedPaths();
+    const add = [...visible].filter((path) => !selected.has(path));
+    const remove = [...selected].filter((path) => visible.has(path));
+
+    // Drop first, then add. The explorer's selectedDoms is a Set, so insertion
+    // order is selection order -- and operators that care which node came first
+    // read that order. Clearing before adding keeps it meaningful.
+    this.deselect(remove);
+    const n = this.select(add);
+
+    if (!n) new Notice("Manifold: everything visible was already selected", 2500);
+    else new Notice(`Selected ${n} note${n === 1 ? "" : "s"}, cleared ${remove.length}`, 3000);
+  }
+
   /** Neighbours that are files, so they can actually be selected. */
   selectableNeighbours(adjacency, id) {
     const out = [];
@@ -2436,7 +2567,8 @@ class GraphSelectionTools extends Feature {
     const menu = new Menu();
     // Triggering Obsidian's own event means every plugin that contributes
     // multi-file items shows up here too, without knowing about us.
-    this.app.workspace.trigger("files-menu", menu, files, "claude-lab-graph-selection");
+    this.app.workspace.trigger("files-menu", menu, files, "manifold-graph-selection");
+    if (this.settings.viewMenu) this.addSelectSubmenu(menu, "selection");
     menu.showAtMouseEvent(evt);
     return true;
   }
@@ -2621,6 +2753,13 @@ class GraphSelectionTools extends Feature {
         "Right-clicking a node that is part of a multi-selection opens Obsidian's own multi-file menu, including items added by other plugins."
       )
       .addToggle((t) => t.setValue(s.contextMenu).onChange(bind("contextMenu")));
+
+    new Setting(containerEl)
+      .setName("Show a Select menu on the graph")
+      .setDesc(
+        "Adds a Select submenu to the graph's tab menu, and to the right-click menu of a multi-selection. Every selection command is also in the command palette."
+      )
+      .addToggle((t) => t.setValue(s.viewMenu).onChange(bind("viewMenu")));
   }
 }
 /* ------------------------------------------------------------------ *

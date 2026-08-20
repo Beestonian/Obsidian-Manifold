@@ -76,6 +76,10 @@ Select one or more notes first. Then use these keys.
 | `Alt` `=` | Add the notes that connect to your selection |
 | `Alt` `-` | Remove the notes at the edge of your selection |
 | `Alt` `L` | Add all notes in the same group |
+| `Alt` `I` | Select the notes that are not selected |
+
+`Alt` `I` uses only the notes that you can see. Notes that a filter hides stay as
+they are.
 
 `Alt` `-` removes only the notes at the edge. If you select a full group, that group
 has no edge. Then `Alt` `-` does nothing. This is correct.
@@ -84,6 +88,13 @@ The plugin uses only the links that you can see. If you hide tags, or you type a
 search, the plugin obeys that.
 
 ![A selection in the graph grows to include the connected notes.](docs/images/grow.png)
+
+You do not need to remember the keys. Every command is also in a menu:
+
+- Click the **⋮** button on the graph tab. Then click **Select**.
+- Or right-click a note in a selection. Then click **Select**.
+
+![The Select menu is open on the graph tab. It lists the selection commands.](docs/images/select-menu.png)
 
 ---
 
@@ -146,6 +157,7 @@ Open **Settings → Manifold Graph**. You can turn off each part of the plugin.
 | Tint folders holding a selection | on | Colours the folders that hold a selected file |
 | Expand folders when selecting | off | Opens folders to show the selected files |
 | Right-click a selection for the file menu | on | Right-click menu |
+| Show a Select menu on the graph | on | Adds the **Select** menu to the graph tab and the right-click menu |
 
 ---
 
