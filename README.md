@@ -76,10 +76,34 @@ Select one or more notes first. Then use these keys.
 | `Alt` `=` | Add the notes that connect to your selection |
 | `Alt` `-` | Remove the notes at the edge of your selection |
 | `Alt` `L` | Add all notes in the same group |
+| `Alt` `A` | Select every note in the graph |
 | `Alt` `I` | Select the notes that are not selected |
 
-`Alt` `I` uses only the notes that you can see. Notes that a filter hides stay as
-they are.
+`Alt` `A` and `Alt` `I` use only the notes that you can see. Notes that a filter
+hides stay as they are.
+
+---
+
+## Select notes by tag, folder or property
+
+Manifold Graph has no command for this. You do not need one. Use the search box in
+the graph instead:
+
+1. Open the graph.
+2. Open the graph settings. Type a query in the **Search** box. For example,
+   `tag:#project` or `path:Archive/`.
+3. The graph now shows only those notes.
+4. Press `Alt` `A`. This selects all of them.
+5. Clear the **Search** box.
+
+You now have the full graph again, and your notes stay selected.
+
+This works with all Obsidian search terms. You can use `tag:`, `path:`, `file:`,
+`line:`, a property name in brackets, or plain text. You can also join them with
+`OR` and `-`.
+
+The selection is safe because it lives in the file explorer. The graph can change
+under it.
 
 `Alt` `-` removes only the notes at the edge. If you select a full group, that group
 has no edge. Then `Alt` `-` does nothing. This is correct.

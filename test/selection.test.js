@@ -349,12 +349,12 @@ function lasso(x1, y1, x2, y2) {
   check(
     "and every operator is in it",
     submenu && submenu.titles(),
-    ["Invert", "Clear", "Grow along links", "Shrink from edges", "Whole cluster"]
+    ["All", "None", "Invert", "Grow along links", "Shrink from edges", "Whole cluster"]
   );
   check(
     "grouped so the menu draws separators",
     submenu && submenu.items.map((i) => i.section),
-    ["basic", "basic", "walk", "walk", "walk"]
+    ["basic", "basic", "basic", "walk", "walk", "walk"]
   );
 
   // The submenu is generated from the same table the palette is built from, so
@@ -366,6 +366,36 @@ function lasso(x1, y1, x2, y2) {
     [...tools.selectedPaths()].sort(),
     ["Notes/Orphan.md", "Notes/Sub/Deep.md"]
   );
+  reset();
+
+  /* =========== select all visible ===========
+     The second half of filter -> select all -> clear filter. What counts as
+     "all" is whatever the graph is showing, so a filtered graph selects only
+     what survived the filter. */
+
+  tools.selectAllVisible();
+  check(
+    "select all takes every selectable node in the graph",
+    [...tools.selectedPaths()].sort(),
+    ["Notes/Alpha.md", "Notes/Beta.md", "Notes/Orphan.md", "Notes/Sub/Deep.md"]
+  );
+  check(
+    "and never a tag or an unresolved link",
+    [...tools.selectedPaths()].some((p) => p.startsWith("#") || p === "Ghost"),
+    false
+  );
+  reset();
+
+  // Hide a node the way a filter would, and "all" has to mean the smaller set.
+  const hidden = renderer.nodeLookup["Notes/Beta.md"];
+  delete renderer.nodeLookup["Notes/Beta.md"];
+  tools.selectAllVisible();
+  check(
+    "a filtered-out note is not part of all",
+    tools.selectedPaths().has("Notes/Beta.md"),
+    false
+  );
+  renderer.nodeLookup["Notes/Beta.md"] = hidden;
   reset();
 
   /* =========== invert =========== */

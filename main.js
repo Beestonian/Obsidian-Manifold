@@ -2071,6 +2071,26 @@ class GraphSelectionTools extends Feature {
   selectOps() {
     return [
       {
+        id: "select-all-graph-selection",
+        name: "Select every note in the visible graph",
+        short: "All",
+        icon: "lucide-box-select",
+        group: "basic",
+        hotkeys: [{ modifiers: ["Alt"], key: "a" }],
+        run: () => this.selectAllVisible(),
+      },
+      {
+        id: "clear-graph-selection",
+        name: "Clear file selection",
+        short: "None",
+        icon: "lucide-x",
+        group: "basic",
+        run: () => {
+          const tree = this.fileTree();
+          if (tree && tree.clearSelectedDoms) tree.clearSelectedDoms();
+        },
+      },
+      {
         id: "invert-graph-selection",
         name: "Invert selection in the visible graph",
         short: "Invert",
@@ -2078,17 +2098,6 @@ class GraphSelectionTools extends Feature {
         group: "basic",
         hotkeys: [{ modifiers: ["Alt"], key: "i" }],
         run: () => this.invertSelection(),
-      },
-      {
-        id: "clear-graph-selection",
-        name: "Clear file selection",
-        short: "Clear",
-        icon: "lucide-x",
-        group: "basic",
-        run: () => {
-          const tree = this.fileTree();
-          if (tree && tree.clearSelectedDoms) tree.clearSelectedDoms();
-        },
       },
       {
         id: "grow-graph-selection",
@@ -2368,6 +2377,40 @@ class GraphSelectionTools extends Feature {
       if (this.fileFor(id)) out.add(id);
     }
     return out;
+  }
+
+  /**
+   * Select everything the graph is currently showing.
+   *
+   * This is the second half of a filter-and-select: narrow the graph with a
+   * search or a filter, take all of it, then clear the filter. The selection
+   * survives because it lives in the file explorer, not in the graph -- so the
+   * graph can be rebuilt underneath it without losing anything. Obsidian's own
+   * search syntax then does the work of any "select by tag / folder / property"
+   * operator we could write here, and composes in ways we could not.
+   */
+  selectAllVisible() {
+    const renderer = this.graphForSelection();
+    if (!renderer) {
+      new Notice("Manifold: no graph open", 3000);
+      return;
+    }
+
+    const visible = this.selectableVisibleIds(renderer);
+    if (!visible.size) {
+      new Notice("Manifold: nothing selectable in this graph", 2500);
+      return;
+    }
+
+    const selected = this.selectedPaths();
+    const add = [...visible].filter((path) => !selected.has(path));
+    if (!add.length) {
+      new Notice("Manifold: everything visible was already selected", 2500);
+      return;
+    }
+
+    const n = this.select(add);
+    new Notice(`Selected ${n} note${n === 1 ? "" : "s"}`, 3000);
   }
 
   /**
