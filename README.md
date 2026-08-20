@@ -6,6 +6,10 @@ small features, each one self-contained so a good one can be lifted out later.
 No build step. `main.js` is plain CommonJS and is exactly what Obsidian loads —
 edit it and hit **Reload app without saving** (or toggle the plugin off/on).
 
+> **Installing or using it?** See **[USAGE.md](USAGE.md)** — install, every gesture,
+> the settings reference and troubleshooting. This file is the design document:
+> what the signal path looks like and why it's shaped that way.
+
 ## Features
 
 ### 1. Graph hover highlight
