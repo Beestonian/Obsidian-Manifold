@@ -79,8 +79,21 @@ Select one or more notes first. Then use these keys.
 | `Alt` `A` | Select every note in the graph |
 | `Alt` `I` | Select the notes that are not selected |
 
+`Alt` `-` removes only the notes at the edge. If you select a full group, that group
+has no edge. Then `Alt` `-` does nothing. This is correct.
+
 `Alt` `A` and `Alt` `I` use only the notes that you can see. Notes that a filter
-hides stay as they are.
+hides stay as they are. The plugin uses only the links that you can see. If you
+hide tags, or you type a search, the plugin obeys that.
+
+![A selection in the graph grows to include the connected notes.](docs/images/grow.png)
+
+You do not need to remember the keys. Every command is also in a menu:
+
+- Click the **⋮** button on the graph tab. Then click **Select**.
+- Or right-click a note in a selection. Then click **Select**.
+
+![The Select menu is open on the graph tab. It lists the selection commands.](docs/images/select-menu.png)
 
 ---
 
@@ -129,21 +142,6 @@ This works with all Obsidian search terms. You can use `tag:`, `path:`, `file:`,
 
 The selection is safe because it lives in the file explorer. The graph can change
 under it.
-
-`Alt` `-` removes only the notes at the edge. If you select a full group, that group
-has no edge. Then `Alt` `-` does nothing. This is correct.
-
-The plugin uses only the links that you can see. If you hide tags, or you type a
-search, the plugin obeys that.
-
-![A selection in the graph grows to include the connected notes.](docs/images/grow.png)
-
-You do not need to remember the keys. Every command is also in a menu:
-
-- Click the **⋮** button on the graph tab. Then click **Select**.
-- Or right-click a note in a selection. Then click **Select**.
-
-![The Select menu is open on the graph tab. It lists the selection commands.](docs/images/select-menu.png)
 
 ---
 
