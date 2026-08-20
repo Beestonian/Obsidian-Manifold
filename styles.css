@@ -1,0 +1,62 @@
+/* Claude Lab -- shared styles.
+   Every feature prefixes its classes with "claude-lab-". */
+
+/* The hovered thing, outlined only when it matched a node in an open graph --
+   so it is feedback ("yes, this exists over there"), not just a hover style.
+   Applied only to embeds and Bases rows, which have no hover feedback of their
+   own. A drawn outline, no blur and no transition: a blurred shadow over text
+   is an expensive repaint, and it was the source of the lag. */
+.claude-lab-graph-linked {
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--text-accent-hover);
+}
+
+/* The graph's control cluster, nudged when the hovered thing exists in the
+   vault but is not on screen -- a filter is hiding it. One soft pulse, then it
+   settles to a thin ring and fades out on its own. */
+.claude-lab-filter-hint {
+  border-radius: var(--radius-s, 4px);
+  box-shadow: 0 0 0 1px var(--text-accent);
+  animation: claude-lab-filter-pulse 1.6s ease-out;
+}
+
+@keyframes claude-lab-filter-pulse {
+  0% { box-shadow: 0 0 0 0 var(--text-accent); }
+  25% { box-shadow: 0 0 0 2px var(--text-accent); }
+  100% { box-shadow: 0 0 0 1px var(--text-accent); }
+}
+
+/* Graph selection tools: the lasso outline. Sits over the canvas and never
+   takes pointer events, so the drag keeps flowing to the handlers. */
+.claude-lab-lasso {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.claude-lab-lasso path {
+  fill: var(--text-accent);
+  fill-opacity: 0.1;
+  stroke: var(--text-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  stroke-linejoin: round;
+}
+
+/* A folder containing selected files. Deliberately the explorer's own hover
+   tint rather than its selection colour: this says "something in here", not
+   "this is selected". Real selection outranks it, hence the :not(). */
+.claude-lab-contains-selection:not(.is-selected) {
+  background-color: var(--nav-item-background-hover, var(--background-modifier-hover));
+}
+
+/* An explorer row answering a graph hover. Same tint the explorer gives a row
+   under the pointer, because that is what it means -- it just happens to be
+   driven from the other view. Real selection outranks it. */
+.claude-lab-explorer-hover:not(.is-selected) {
+  background-color: var(--nav-item-background-hover, var(--background-modifier-hover));
+}
+

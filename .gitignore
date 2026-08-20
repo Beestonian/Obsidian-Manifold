@@ -1,0 +1,13 @@
+# Obsidian writes your own feature toggles here at runtime. Keeping it local
+# means clones start on defaults, and flipping a switch in the settings tab
+# doesn't show up as an uncommitted change.
+data.json
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+
+# NOTE: main.js is deliberately NOT ignored. Most Obsidian plugin repos ignore
+# it because it's a bundler output -- here it's the hand-written source that
+# Obsidian loads directly, so it has to be committed.

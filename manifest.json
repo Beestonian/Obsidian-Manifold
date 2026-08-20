@@ -1,0 +1,9 @@
+{
+  "id": "claude-plugins",
+  "name": "Claude Lab",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "A sandbox of small quality-of-life features. First up: hovering a link or tag in a note highlights that node in the graph view.",
+  "author": "Jordan + Claude",
+  "isDesktopOnly": false
+}
